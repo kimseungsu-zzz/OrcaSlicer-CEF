@@ -1,0 +1,56 @@
+diff --git a/build/cmake/lib/webview_chromium/CMakeLists.txt b/build/cmake/lib/webview_chromium/CMakeLists.txt
+--- a/build/cmake/lib/webview_chromium/CMakeLists.txt
++++ b/build/cmake/lib/webview_chromium/CMakeLists.txt
+@@ -323,6 +323,14 @@
+ wx_lib_include_directories(wxwebview PRIVATE ${CEF_ROOT})
+ wx_add_dependencies(wxwebview libcef_dll_wrapper)
+-wx_lib_link_libraries(wxwebview PUBLIC libcef libcef_dll_wrapper)
++# Export the CEF shared object path explicitly because the imported libcef
++# target is not exported by wxWidgetsTargets.
++wx_lib_link_libraries(wxwebview PUBLIC "${CEF_ROOT}/Release/libcef${CMAKE_SHARED_LIBRARY_SUFFIX}" libcef_dll_wrapper)
++# CEF headers use C++20 concepts; enable it only for the Chromium WebView target.
++target_compile_features(wxwebview PRIVATE cxx_std_20)
++# Match the versioned C API used by the packaged CEF 147 binary. The default
++# experimental API exposes newer client struct layouts than libcef expects.
++target_compile_definitions(wxwebview PRIVATE CEF_API_VERSION=14700)
++target_compile_definitions(libcef_dll_wrapper PUBLIC CEF_API_VERSION=14700)
+ 
+ mark_as_advanced(USE_ATL)
+ mark_as_advanced(USE_SANDBOX)
+diff --git a/src/common/webview_chromium.cpp b/src/common/webview_chromium.cpp
+--- a/src/common/webview_chromium.cpp
++++ b/src/common/webview_chromium.cpp
+@@ -735,3 +735,7 @@
+                                   CefRefPtr<CefCommandLine> command_line) override
+     {
++#ifdef __WXGTK__
++        // The wxWidgets CEF backend embeds its browser view through X11.
++        command_line->AppendSwitchWithValue("ozone-platform", "x11");
++#endif
+         if ( process_type.empty() && !m_disableFileAccess )
+@@ -1124,3 +1130,18 @@ bool wxWebViewChromium::InitCEF(const wxWebViewConfiguration& config)
+     CefSettings settings;
++
++#ifdef __WXGTK__
++    // OrcaSlicer stages CEF resources in a Resources subdirectory beside the
++    // executable. CEF otherwise looks beside libcef.so for icudtl.dat.
++    wxFileName resourcesDir(wxStandardPaths::Get().GetExecutablePath());
++    resourcesDir.SetFullName("");
++    resourcesDir.AppendDir("Resources");
++    CefString(&settings.resources_dir_path).FromWString(
++        resourcesDir.GetFullPath().ToStdWstring());
++
++    wxFileName localesDir = resourcesDir;
++    localesDir.AppendDir("locales");
++    CefString(&settings.locales_dir_path).FromWString(
++        localesDir.GetFullPath().ToStdWstring());
++#endif
+ 
+     const auto app = wxApp::GetInstance();
+@@ -1180,3 +1180,6 @@ bool wxWebViewChromium::InitCEF(const wxWebViewConfiguration& config)
+     CefRefPtr<CefApp> cefApp{new wxCefBrowserApp(
+         configChrome->m_disableFileAccess)};
++    // Configure libcef for the same versioned API used to compile this CEF
++    // wrapper before the first call crosses the C++/C API boundary.
++    (void)cef_api_hash(CEF_API_VERSION, 0);
+     if ( !CefInitialize(args, settings, cefApp, nullptr) )

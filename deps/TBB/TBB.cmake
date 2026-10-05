@@ -1,6 +1,6 @@
 if (MSVC)
     set(_patch_command ${CMAKE_COMMAND} -E copy ${CMAKE_CURRENT_LIST_DIR}/MSVC.cmake ./cmake/compilers/MSVC.cmake)
-elseif (FLATPAK AND "${CMAKE_CXX_COMPILER_ID}" STREQUAL "GNU")
+elseif ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "GNU")
     set(_patch_command ${CMAKE_COMMAND} -E copy ${CMAKE_CURRENT_LIST_DIR}/GNU.cmake ./cmake/compilers/GNU.cmake)
 else()
     set(_patch_command "")
@@ -25,5 +25,4 @@ orcaslicer_add_cmake_project(
 if (MSVC)
     add_debug_dep(dep_TBB)
 endif ()
-
 

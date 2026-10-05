@@ -7,7 +7,20 @@ pkgs.mkShell {
   # Reuse the native build dependencies from nixpkgs' OrcaSlicer package, while
   # substituting a CEF-enabled wxWidgets build from this repository's deps.
   inputsFrom = [ pkgs.orca-slicer ];
-  nativeBuildInputs = [ pkgs.cmake pkgs.git pkgs.ninja pkgs.pkg-config pkgs.wayland pkgs.wayland-scanner ];
+  nativeBuildInputs = [
+    pkgs.cmake
+    pkgs.autoconf
+    pkgs.automake
+    pkgs.git
+    pkgs.gnum4
+    pkgs.libtool
+    pkgs.nasm
+    pkgs.libxkbcommon
+    pkgs.ninja
+    pkgs.pkg-config
+    pkgs.wayland
+    pkgs.wayland-scanner
+  ];
   packages = [ cef pkgs.libdatachannel ];
 
   CEF_ROOT = "${cef}";

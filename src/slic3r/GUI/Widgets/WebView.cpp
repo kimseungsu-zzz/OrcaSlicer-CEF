@@ -328,7 +328,11 @@ wxWebView* WebView::CreateWebView(wxWindow * parent, wxString const & url)
         // And the memory: file system
         webView->RegisterHandler(wxSharedPtr<wxWebViewHandler>(new wxWebViewFSHandler("memory")));
 #else
-        // With WKWebView handlers need to be registered before creation.
+#if defined(__linux__) && defined(SLIC3R_USE_CEF)
+        // CEF initializes inside Create(), so register global scheme factories
+        // only after that initialization has completed.
+        webViewCreated = webView->Create(parent, wxID_ANY, url2, wxDefaultPosition, wxDefaultSize, wxBORDER_NONE);
+#endif
         // On Linux (WebKit2GTK), URI schemes are registered globally and can only
         // be registered once, so guard against multiple registrations.
         static bool s_schemes_registered = false;
@@ -337,7 +341,9 @@ wxWebView* WebView::CreateWebView(wxWindow * parent, wxString const & url)
             webView->RegisterHandler(wxSharedPtr<wxWebViewHandler>(new wxWebViewFSHandler("memory")));
             s_schemes_registered = true;
         }
+#if !defined(__linux__) || !defined(SLIC3R_USE_CEF)
         webViewCreated = webView->Create(parent, wxID_ANY, url2, wxDefaultPosition, wxDefaultSize, wxBORDER_NONE);
+#endif
 #if defined(__linux__) && defined(SLIC3R_USE_CEF)
         // CEF supplies its native Linux user agent. Its wxWidgets backend doesn't expose
         // a per-view user-agent override, so don't send the old WebKit/macOS spoof string.

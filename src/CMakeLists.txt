@@ -137,11 +137,30 @@ if (WIN32)
 else ()
     add_executable(OrcaSlicer OrcaSlicer.cpp OrcaSlicer.hpp)
     if (SLIC3R_USE_CEF)
+        add_executable(OrcaSlicer_cef_helper
+            "${CMAKE_CURRENT_SOURCE_DIR}/cef_process_helper.cpp")
+        target_include_directories(OrcaSlicer_cef_helper PRIVATE "${SLIC3R_CEF_ROOT}")
+        target_compile_features(OrcaSlicer_cef_helper PRIVATE cxx_std_20)
+        target_compile_definitions(OrcaSlicer_cef_helper PRIVATE CEF_API_VERSION=14700)
+        target_link_libraries(OrcaSlicer_cef_helper PRIVATE
+            "${SLIC3R_CEF_ROOT}/Release/libcef.so"
+            wx::libcef_dll_wrapper)
+        set_target_properties(OrcaSlicer_cef_helper PROPERTIES
+            OUTPUT_NAME "OrcaSlicer_cef_helper"
+            BUILD_RPATH "$ORIGIN"
+            INSTALL_RPATH "$ORIGIN")
+        add_dependencies(OrcaSlicer OrcaSlicer_cef_helper)
         add_custom_command(TARGET OrcaSlicer POST_BUILD
             COMMAND ${CMAKE_COMMAND} -E copy_directory
                     "${SLIC3R_CEF_ROOT}/Release" "$<TARGET_FILE_DIR:OrcaSlicer>"
             COMMAND ${CMAKE_COMMAND} -E copy_directory
                     "${SLIC3R_CEF_ROOT}/Resources" "$<TARGET_FILE_DIR:OrcaSlicer>/Resources"
+            COMMAND ${CMAKE_COMMAND} -E copy
+                    "${SLIC3R_CEF_ROOT}/Resources/icudtl.dat" "$<TARGET_FILE_DIR:OrcaSlicer>/icudtl.dat"
+            COMMAND ${CMAKE_COMMAND} -E copy
+                    "${SLIC3R_CEF_ROOT}/Resources/chrome_100_percent.pak" "$<TARGET_FILE_DIR:OrcaSlicer>/chrome_100_percent.pak"
+            COMMAND ${CMAKE_COMMAND} -E copy
+                    "${SLIC3R_CEF_ROOT}/Resources/resources.pak" "$<TARGET_FILE_DIR:OrcaSlicer>/resources.pak"
             COMMENT "Staging the CEF runtime beside OrcaSlicer"
             VERBATIM)
     endif ()
@@ -164,7 +183,7 @@ if (APPLE)
 elseif (UNIX AND NOT WIN32)
     set_target_properties(OrcaSlicer PROPERTIES
         # Build tree + AppImage, which packages the build-tree binary.
-        BUILD_RPATH "$ORIGIN/python/lib;$ORIGIN/../lib/python/lib"
+        BUILD_RPATH "$ORIGIN;$ORIGIN/python/lib;$ORIGIN/../lib/python/lib"
         # Flatpak (cmake --install).
         INSTALL_RPATH "$ORIGIN/../libpython/lib")
 endif ()
@@ -406,8 +425,16 @@ else ()
         install(FILES ${output_sos_${build_type}} DESTINATION "${CMAKE_INSTALL_PREFIX}")
     endif()
     install(TARGETS OrcaSlicer RUNTIME DESTINATION "${CMAKE_INSTALL_BINDIR}" BUNDLE DESTINATION ${CMAKE_INSTALL_BINDIR})
+    if (SLIC3R_USE_CEF)
+        install(TARGETS OrcaSlicer_cef_helper RUNTIME DESTINATION "${CMAKE_INSTALL_BINDIR}")
+    endif ()
 endif ()
 if (SLIC3R_USE_CEF)
     install(DIRECTORY "${SLIC3R_CEF_ROOT}/Release/" DESTINATION "${CMAKE_INSTALL_BINDIR}")
     install(DIRECTORY "${SLIC3R_CEF_ROOT}/Resources/" DESTINATION "${CMAKE_INSTALL_BINDIR}/Resources")
+    install(FILES "${SLIC3R_CEF_ROOT}/Resources/icudtl.dat" DESTINATION "${CMAKE_INSTALL_BINDIR}")
+    install(FILES
+        "${SLIC3R_CEF_ROOT}/Resources/chrome_100_percent.pak"
+        "${SLIC3R_CEF_ROOT}/Resources/resources.pak"
+        DESTINATION "${CMAKE_INSTALL_BINDIR}")
 endif ()

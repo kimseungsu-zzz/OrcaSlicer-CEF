@@ -24,3 +24,8 @@ apply_wx_cef_patch(
     "include/cef_version_info.h"
     "src/common/webview_chromium.cpp"
 )
+apply_wx_cef_patch(
+    "0004-cef-cxx20-compat.patch"
+    "cef_api_hash(CEF_API_VERSION, 0)"
+    "src/common/webview_chromium.cpp"
+)
