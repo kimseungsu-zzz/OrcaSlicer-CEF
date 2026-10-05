@@ -7,6 +7,7 @@
 #include "MsgDialog.hpp"
 #include "NotificationManager.hpp"
 #include "Plater.hpp"
+#include "Widgets/WebView.hpp"
 #include "Widgets/WebViewHostDialog.hpp"
 
 #include "slic3r/Utils/MacDarkMode.hpp"
