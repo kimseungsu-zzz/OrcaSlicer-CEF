@@ -25,14 +25,14 @@
 #include <wx/utils.h>
 #include <wx/webview.h>
 
-#ifdef __linux__
+#if defined(__linux__) && !defined(SLIC3R_USE_CEF)
 #include <webkit2/webkit2.h>
 #endif
 
 namespace Slic3r {
 namespace GUI {
 
-#ifdef __linux__
+#if defined(__linux__) && !defined(SLIC3R_USE_CEF)
 // Workaround for #7210: WebKitGTK crashes on vue-resize's hidden <object> probe used by
 // older Fluidd/Mainsail pages. Swap that <object> for a <div> shim at appendChild time
 // and bridge resize events through a fake contentDocument.defaultView so vue-resize keeps
@@ -162,14 +162,11 @@ void PrinterWebView::create_browser()
 {
     m_browser = WebView::CreateWebView(this, "");
 
-#ifdef __linux__
+#if defined(__linux__) && !defined(SLIC3R_USE_CEF)
     inject_vue_resize_workaround(m_browser);
 
     auto cookiesPath = boost::filesystem::path(data_dir() + "/cache/cookies.db");
-    auto wv = static_cast<WebKitWebView*>(m_browser->GetNativeBackend());
-    auto wv_ctx = webkit_web_view_get_context(wv);
-    auto cookieManager = webkit_web_context_get_cookie_manager(wv_ctx);
-    webkit_cookie_manager_set_persistent_storage(cookieManager, cookiesPath.c_str(), WEBKIT_COOKIE_PERSISTENT_STORAGE_SQLITE);
+    WebView::SetPrinterCookieStorage(m_browser, wxString::FromUTF8(cookiesPath.string()));
 #endif
 
     m_browser->Bind(wxEVT_WEBVIEW_ERROR, &PrinterWebView::OnError, this);
@@ -274,7 +271,7 @@ void PrinterWebView::SendAPIKey()
     else
         wxLogError("Could not add script message handler");
 
-#ifdef __linux__
+#if defined(__linux__) && !defined(SLIC3R_USE_CEF)
     // Re-inject the vue-resize/WebKitGTK workaround that RemoveAllUserScripts just cleared.
     inject_vue_resize_workaround(m_browser);
 #endif

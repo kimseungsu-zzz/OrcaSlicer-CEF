@@ -1,0 +1,44 @@
+diff --git a/src/common/webview_chromium.cpp b/src/common/webview_chromium.cpp
+index 00a5aa0..11d27c6 100644
+--- a/src/common/webview_chromium.cpp
++++ b/src/common/webview_chromium.cpp
+@@ -71,6 +71,7 @@ wxGCC_WARNING_SUPPRESS(unused-parameter)
+ #include "include/cef_scheme.h"
+ #include "include/cef_string_visitor.h"
+ #include "include/cef_version.h"
++#include "include/cef_version_info.h"
+ #include "include/base/cef_lock.h"
+ #include "include/wrapper/cef_resource_manager.h"
+ 
+@@ -397,9 +398,10 @@ public:
+     // CefLifeSpanHandler methods
+     virtual bool OnBeforePopup(CefRefPtr<CefBrowser> browser,
+         CefRefPtr<CefFrame> frame,
++        int popup_id,
+         const CefString& target_url,
+         const CefString& target_frame_name,
+-        cef_window_open_disposition_t target_disposition,
++        CefLifeSpanHandler::WindowOpenDisposition target_disposition,
+         bool user_gesture,
+         const CefPopupFeatures& popupFeatures,
+         CefWindowInfo& windowInfo,
+@@ -1732,9 +1734,10 @@ void ClientHandler::OnContextMenuDismissed(CefRefPtr<CefBrowser> WXUNUSED(browse
+ // CefLifeSpanHandler methods
+ bool ClientHandler::OnBeforePopup(CefRefPtr<CefBrowser> WXUNUSED(browser),
+                              CefRefPtr<CefFrame> WXUNUSED(frame),
++                             int WXUNUSED(popup_id),
+                              const CefString& target_url,
+                              const CefString& target_frame_name,
+-                             cef_window_open_disposition_t WXUNUSED(target_disposition),
++                             CefLifeSpanHandler::WindowOpenDisposition WXUNUSED(target_disposition),
+                              bool WXUNUSED(user_gesture),
+                              const CefPopupFeatures& WXUNUSED(popupFeatures),
+                              CefWindowInfo& WXUNUSED(windowInfo),
+@@ -1906,7 +1909,6 @@ void ClientHandler::OnLoadError(CefRefPtr<CefBrowser> WXUNUSED(browser),
+         ERROR_TYPE_CASE(ERR_ADDRESS_UNREACHABLE, wxWEBVIEW_NAV_ERR_CONNECTION);
+         ERROR_TYPE_CASE(ERR_SSL_CLIENT_AUTH_CERT_NEEDED, wxWEBVIEW_NAV_ERR_AUTH);
+         ERROR_TYPE_CASE(ERR_TUNNEL_CONNECTION_FAILED, wxWEBVIEW_NAV_ERR_CONNECTION);
+-        ERROR_TYPE_CASE(ERR_NO_SSL_VERSIONS_ENABLED, wxWEBVIEW_NAV_ERR_SECURITY);
+         ERROR_TYPE_CASE(ERR_SSL_VERSION_OR_CIPHER_MISMATCH, wxWEBVIEW_NAV_ERR_SECURITY);
+         ERROR_TYPE_CASE(ERR_SSL_RENEGOTIATION_REQUESTED, wxWEBVIEW_NAV_ERR_REQUEST);
+         ERROR_TYPE_CASE(ERR_CERT_COMMON_NAME_INVALID, wxWEBVIEW_NAV_ERR_CERTIFICATE);

@@ -1,0 +1,16 @@
+diff --git a/build/cmake/lib/webview_chromium/CMakeLists.txt b/build/cmake/lib/webview_chromium/CMakeLists.txt
+index 904bc55..0000000 100644
+--- a/build/cmake/lib/webview_chromium/CMakeLists.txt
++++ b/build/cmake/lib/webview_chromium/CMakeLists.txt
+@@ -297,8 +297,9 @@ macro(rls_flags property)
+         )
+     endif()
+ endmacro()
+-rls_flags(COMPILE_DEFINITIONS)
+-rls_flags(COMPILE_OPTIONS)
++# CEF uses nested generator expressions for its compile flags. The string
++# slicing above cannot handle nested expressions and leaves invalid $<0: tokens
++# in GCC flags. Debug and Release are configured directly on the CEF target.
+ 
+ 
+ add_library(libcef SHARED IMPORTED GLOBAL)

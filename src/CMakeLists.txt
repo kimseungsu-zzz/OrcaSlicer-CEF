@@ -30,8 +30,7 @@ if (SLIC3R_GUI)
     endif()
 
     if (CMAKE_SYSTEM_NAME STREQUAL "Linux")
-        set (wxWidgets_CONFIG_OPTIONS "--toolkit=gtk${SLIC3R_GTK}")
-        find_package(wxWidgets 3.3 REQUIRED COMPONENTS base core adv html gl aui net media webview)
+        find_package(wxWidgets 3.3 CONFIG REQUIRED COMPONENTS base core adv html gl aui net media webview)
     else ()
         # propgrid is required by wxInspector.
         find_package(wxWidgets 3.3 CONFIG REQUIRED COMPONENTS html adv gl core base webview aui net media propgrid)
@@ -137,6 +136,15 @@ if (WIN32)
     add_library(OrcaSlicer SHARED OrcaSlicer.cpp OrcaSlicer.hpp)
 else ()
     add_executable(OrcaSlicer OrcaSlicer.cpp OrcaSlicer.hpp)
+    if (SLIC3R_USE_CEF)
+        add_custom_command(TARGET OrcaSlicer POST_BUILD
+            COMMAND ${CMAKE_COMMAND} -E copy_directory
+                    "${SLIC3R_CEF_ROOT}/Release" "$<TARGET_FILE_DIR:OrcaSlicer>"
+            COMMAND ${CMAKE_COMMAND} -E copy_directory
+                    "${SLIC3R_CEF_ROOT}/Resources" "$<TARGET_FILE_DIR:OrcaSlicer>/Resources"
+            COMMENT "Staging the CEF runtime beside OrcaSlicer"
+            VERBATIM)
+    endif ()
 endif ()
 
 if (MINGW)
@@ -398,4 +406,8 @@ else ()
         install(FILES ${output_sos_${build_type}} DESTINATION "${CMAKE_INSTALL_PREFIX}")
     endif()
     install(TARGETS OrcaSlicer RUNTIME DESTINATION "${CMAKE_INSTALL_BINDIR}" BUNDLE DESTINATION ${CMAKE_INSTALL_BINDIR})
+endif ()
+if (SLIC3R_USE_CEF)
+    install(DIRECTORY "${SLIC3R_CEF_ROOT}/Release/" DESTINATION "${CMAKE_INSTALL_BINDIR}")
+    install(DIRECTORY "${SLIC3R_CEF_ROOT}/Resources/" DESTINATION "${CMAKE_INSTALL_BINDIR}/Resources")
 endif ()

@@ -21,12 +21,30 @@ else ()
     set(_wx_edge "-DwxUSE_WEBVIEW_EDGE=OFF")
 endif ()
 
+if (SLIC3R_USE_CEF)
+    set(_wx_chromium "-DwxUSE_WEBVIEW_CHROMIUM=ON")
+    set(_wx_webkit "-DwxUSE_WEBVIEW_WEBKIT=OFF")
+    set(_wx_cef_root "-DCEF_ROOT:PATH=${SLIC3R_CEF_ROOT}")
+else ()
+    set(_wx_chromium "-DwxUSE_WEBVIEW_CHROMIUM=OFF")
+    set(_wx_webkit "-DwxUSE_WEBVIEW_WEBKIT=ON")
+    set(_wx_cef_root "")
+endif ()
+
 set(_wx_patch_command "")
 if (APPLE)
     set(_wx_patch_command
         ${GIT_EXECUTABLE} checkout -f -- src/osx/cocoa/colour.mm
         COMMAND ${GIT_EXECUTABLE} apply --verbose
                 ${CMAKE_CURRENT_LIST_DIR}/0001-macos-use-srgb-colour-components.patch
+    )
+endif ()
+
+if (SLIC3R_USE_CEF)
+    set(_wx_patch_command
+        ${CMAKE_COMMAND}
+        "-DCEF_SOURCE=<SOURCE_DIR>"
+        -P "${CMAKE_CURRENT_LIST_DIR}/apply-cef-patch.cmake"
     )
 endif ()
 
@@ -52,6 +70,9 @@ orcaslicer_add_cmake_project(
         -DwxUSE_GLCANVAS_EGL=ON
         -DwxUSE_WEBREQUEST=ON
         -DwxUSE_WEBVIEW=ON
+        ${_wx_chromium}
+        ${_wx_webkit}
+        ${_wx_cef_root}
         ${_wx_edge}
         -DwxUSE_WEBVIEW_IE=OFF
         -DwxUSE_REGEX=builtin

@@ -1,6 +1,7 @@
 #include "WebView.hpp"
 #include "slic3r/GUI/Widgets/StateColor.hpp"
 #include "slic3r/GUI/GUI_App.hpp"
+#include "slic3r/GUI/LinuxDisplayBackend.hpp"
 #include "slic3r/Utils/MacDarkMode.hpp"
 
 #include <algorithm>
@@ -35,6 +36,9 @@
 #include <wx/filename.h>
 #include <wx/stdpaths.h>
 #include <boost/filesystem.hpp>
+#if wxUSE_WEBVIEW_CHROMIUM
+#include <wx/webview_chromium.h>
+#endif
 
 namespace fs = boost::filesystem;
 #if defined(__WIN32__) || defined(__WXMAC__)
@@ -47,23 +51,14 @@ namespace fs = boost::filesystem;
 #include <slic3r/Utils/Http.hpp>
 #elif defined __linux__
 #include <gtk/gtk.h>
-#define WEBKIT_API
-struct WebKitWebView;
-struct WebKitJavascriptResult;
-extern "C" {
-WEBKIT_API void
-webkit_web_view_run_javascript                       (WebKitWebView             *web_view,
-                                                      const gchar               *script,
-                                                      GCancellable              *cancellable,
-                                                      GAsyncReadyCallback       callback,
-                                                      gpointer                  user_data);
-WEBKIT_API WebKitJavascriptResult *
-webkit_web_view_run_javascript_finish                (WebKitWebView             *web_view,
-                                                      GAsyncResult              *result,
-						      GError                    **error);
-WEBKIT_API void
-webkit_javascript_result_unref              (WebKitJavascriptResult *js_result);
-}
+#if !defined(SLIC3R_USE_CEF)
+#include <webkit2/webkit2.h>
+#endif
+#if defined(SLIC3R_USE_CEF) && !wxUSE_WEBVIEW_CHROMIUM
+#error "SLIC3R_USE_CEF requires wxWidgets built with wxUSE_WEBVIEW_CHROMIUM"
+#elif !defined(SLIC3R_USE_CEF) && !wxUSE_WEBVIEW_WEBKIT
+#error "Linux WebView support requires wxWidgets built with WebKitGTK"
+#endif
 #endif
 
 #ifdef __WIN32__
@@ -280,6 +275,15 @@ static WebViewRef *webview_ref(wxWebView *webView)
 
 wxWebView* WebView::CreateWebView(wxWindow * parent, wxString const & url)
 {
+#if defined(__linux__) && defined(SLIC3R_USE_CEF)
+    if (!Slic3r::GUI::is_running_on_x11()) {
+        wxLogError("The wxWidgets CEF WebView backend requires an X11 display. Run with GDK_BACKEND=x11.");
+        auto* webView = new FakeWebView;
+        webView->SetRefData(new WebViewRef(webView));
+        g_webviews.push_back(webView);
+        return webView;
+    }
+#endif
 #if wxUSE_WEBVIEW_EDGE
     // Check if a fixed version of edge is present in
     // $executable_path/edge_fixed and use it
@@ -302,9 +306,13 @@ wxWebView* WebView::CreateWebView(wxWindow * parent, wxString const & url)
     wxWebView* webView = new WebViewEdge;
 #elif defined(__WXOSX__)
     wxWebView* webView = new WebViewWebKit;
+#elif defined(__linux__) && defined(SLIC3R_USE_CEF)
+    wxWebViewConfiguration config = wxWebView::NewConfiguration(wxWebViewBackendChromium);
+    wxWebView* webView = wxWebView::New(config);
 #else
     auto webView = wxWebView::New();
 #endif
+    bool webViewCreated = false;
     if (webView) {
         webView->SetBackgroundColour(StateColor::darkModeColorFor(*wxWHITE));
 
@@ -314,7 +322,7 @@ wxWebView* WebView::CreateWebView(wxWindow * parent, wxString const & url)
         webView->SetUserAgent(wxString::Format("Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
                                                "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/107.0.0.0 Safari/537.36 Edg/107.0.1418.52 BBL-Slicer/v%s (%s) BBL-Language/%s",
                                                Slic3r::GUI::wxGetApp().get_bbl_client_version(), Slic3r::GUI::wxGetApp().dark_mode() ? "dark" : "light", language_code.mb_str()));
-        webView->Create(parent, wxID_ANY, url2, wxDefaultPosition, wxDefaultSize, wxBORDER_NONE);
+        webViewCreated = webView->Create(parent, wxID_ANY, url2, wxDefaultPosition, wxDefaultSize, wxBORDER_NONE);
         // We register the wxfs:// protocol for testing purposes
         webView->RegisterHandler(wxSharedPtr<wxWebViewHandler>(new wxWebViewArchiveHandler("bbl")));
         // And the memory: file system
@@ -329,10 +337,23 @@ wxWebView* WebView::CreateWebView(wxWindow * parent, wxString const & url)
             webView->RegisterHandler(wxSharedPtr<wxWebViewHandler>(new wxWebViewFSHandler("memory")));
             s_schemes_registered = true;
         }
-        webView->Create(parent, wxID_ANY, url2, wxDefaultPosition, wxDefaultSize, wxBORDER_NONE);
+        webViewCreated = webView->Create(parent, wxID_ANY, url2, wxDefaultPosition, wxDefaultSize, wxBORDER_NONE);
+#if defined(__linux__) && defined(SLIC3R_USE_CEF)
+        // CEF supplies its native Linux user agent. Its wxWidgets backend doesn't expose
+        // a per-view user-agent override, so don't send the old WebKit/macOS spoof string.
+#elif defined(__linux__)
         webView->SetUserAgent(wxString::Format("Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) BBL-Slicer/v%s (%s) BBL-Language/%s",
                                                Slic3r::GUI::wxGetApp().get_bbl_client_version(), Slic3r::GUI::wxGetApp().dark_mode() ? "dark" : "light", language_code.mb_str()));
 #endif
+#endif
+        if (!webViewCreated) {
+            wxLogError("Could not create the selected WebView backend");
+            delete webView;
+            webView = new FakeWebView;
+            webView->SetRefData(new WebViewRef(webView));
+            g_webviews.push_back(webView);
+            return webView;
+        }
 #ifdef __WXMAC__
         WKWebView * wkWebView = (WKWebView *) webView->GetNativeBackend();
         Slic3r::GUI::WKWebView_setTransparentBackground(wkWebView);
@@ -440,6 +461,9 @@ bool WebView::RunScript(wxWebView *webView, wxString const &javascript)
         Slic3r::GUI::WKWebView_evaluateJavaScript(wkWebView, javascript, nullptr);
         return true;
 #else
+#if defined(SLIC3R_USE_CEF)
+        return webView->RunScript(javascript);
+#else
         WebKitWebView *wkWebView = (WebKitWebView *) webView->GetNativeBackend();
         webkit_web_view_run_javascript(
             wkWebView, javascript.utf8_str(), NULL,
@@ -453,9 +477,57 @@ bool WebView::RunScript(wxWebView *webView, wxString const &javascript)
         }, NULL);
         return true;
 #endif
+#endif
     } catch (std::exception &) {
         return false;
     }
+}
+
+void WebView::Focus(wxWebView *webView)
+{
+    if (!webView)
+        return;
+#if defined(__linux__) && !defined(SLIC3R_USE_CEF)
+    if (void* native = webView->GetNativeBackend())
+        gtk_widget_grab_focus(GTK_WIDGET(native));
+    else
+        webView->SetFocus();
+#else
+    webView->SetFocus();
+#endif
+}
+
+void WebView::Refresh(wxWebView *webView)
+{
+    if (!webView)
+        return;
+    webView->Refresh();
+#ifdef __WXOSX__
+    if (void* native = webView->GetNativeBackend())
+        Slic3r::GUI::WKWebView_force_display(native);
+#elif defined(__linux__) && !defined(SLIC3R_USE_CEF)
+    if (void* native = webView->GetNativeBackend())
+        gtk_widget_queue_draw(GTK_WIDGET(native));
+#endif
+    webView->Update();
+}
+
+void WebView::SetPrinterCookieStorage(wxWebView *webView, wxString const &path)
+{
+#if defined(__linux__) && !defined(SLIC3R_USE_CEF)
+    if (!webView)
+        return;
+    auto *native = static_cast<WebKitWebView*>(webView->GetNativeBackend());
+    if (!native)
+        return;
+    WebKitWebContext *context = webkit_web_view_get_context(native);
+    WebKitCookieManager *cookies = webkit_web_context_get_cookie_manager(context);
+    webkit_cookie_manager_set_persistent_storage(
+        cookies, path.utf8_str(), WEBKIT_COOKIE_PERSISTENT_STORAGE_SQLITE);
+#else
+    wxUnusedVar(webView);
+    wxUnusedVar(path);
+#endif
 }
 
 void WebView::RecreateAll()

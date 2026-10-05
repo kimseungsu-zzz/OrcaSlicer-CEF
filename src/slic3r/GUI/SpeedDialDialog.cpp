@@ -33,10 +33,6 @@
 #include <wx/utils.h>
 #include <wx/webview.h>
 
-#ifdef __linux__
-#include <gtk/gtk.h>
-#endif
-
 namespace Slic3r { namespace GUI {
 
 namespace {
@@ -66,20 +62,12 @@ wxString mode_label(ConfigOptionMode mode)
 
 wxColour bg_color() { return wxGetApp().get_window_default_clr(); }
 
-// Give the WebKitGTK widget itself input focus, not its GtkScrolledWindow container.
-// (browser()->SetFocus() grabs focus on the container and doesn't reach the web content,
-// so typing only works after the user clicks.) On Linux the native backend is the
-// WebKitWebView widget; grab focus there directly. Elsewhere SetFocus() is correct.
+// Let the active WebView backend route focus to its native browser widget.
 void focus_webview(wxWebView* browser, bool page_ready)
 {
     if (!browser)
         return;
-#ifdef __linux__
-    if (void* nb = browser->GetNativeBackend())
-        gtk_widget_grab_focus((GtkWidget*) nb);
-#else
-    browser->SetFocus();
-#endif
+    WebView::Focus(browser);
     if (page_ready)
         browser->RunScript("focusInput();");
 }
@@ -297,20 +285,7 @@ void SpeedDialWebDialog::repaint_webview()
     wxWebView* wv = browser();
     if (!wv)
         return;
-    // Portable invalidate; the platform blocks below reach the widget/layer that actually paints.
-    wv->Refresh();
-#ifdef __WXOSX__
-    if (void* nb = wv->GetNativeBackend())
-        WKWebView_force_display(nb);
-    wv->Update();
-#elif defined(__linux__)
-    // WebKitGTK's WebKitWebView owns its own GdkWindow, so invalidating the wxWebView wrapper
-    // (the GtkScrolledWindow) does not redraw it.
-    if (void* nb = wv->GetNativeBackend())
-        gtk_widget_queue_draw((GtkWidget*) nb);
-#else
-    wv->Update();
-#endif
+    WebView::Refresh(wv);
 }
 
 // Rounded corners: the webview paints an opaque rectangle, so round the whole top-level window.

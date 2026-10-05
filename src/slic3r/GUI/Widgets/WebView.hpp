@@ -19,6 +19,9 @@ public:
     static void LoadUrl(wxWebView * webView, wxString const &url);
 
     static bool RunScript(wxWebView * webView, wxString const & msg);
+    static void Focus(wxWebView *webView);
+    static void Refresh(wxWebView *webView);
+    static void SetPrinterCookieStorage(wxWebView *webView, wxString const &path);
 
     // Marks "wx" as registered so CreateWebView's deferred add skips the duplicate.
     static void MarkScriptMessageHandlerAdded(wxWebView * webView);

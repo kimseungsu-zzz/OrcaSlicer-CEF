@@ -356,6 +356,16 @@ find_package(IlmBase QUIET)
 if(NOT IlmBase_FOUND)
   pkg_check_modules(IlmBase QUIET IlmBase)
 endif()
+if(NOT TARGET IlmBase::Half)
+  # OpenVDB 12 and newer use Imath rather than the retired IlmBase package.
+  # Keep the legacy target name expected by the rest of this find module.
+  find_package(Imath CONFIG QUIET)
+  if(TARGET Imath::Imath)
+    add_library(IlmBase::Half INTERFACE IMPORTED)
+    set_property(TARGET IlmBase::Half PROPERTY
+      INTERFACE_LINK_LIBRARIES Imath::Imath)
+  endif()
+endif()
 if (IlmBase_FOUND AND NOT TARGET IlmBase::Half)
   message(STATUS "Falling back to IlmBase found by pkg-config...")
 
@@ -368,7 +378,7 @@ if (IlmBase_FOUND AND NOT TARGET IlmBase::Half)
   set_target_properties(IlmBase::Half PROPERTIES
     IMPORTED_LOCATION "${IlmHalf_LIBRARY}"
     INTERFACE_INCLUDE_DIRECTORIES "${IlmBase_INCLUDE_DIRS}")
-elseif(NOT IlmBase_FOUND)
+elseif(NOT TARGET IlmBase::Half)
   just_fail("IlmBase::Half can not be found!")
 endif()
 find_package(TBB ${_quiet} ${_required} COMPONENTS tbb)
