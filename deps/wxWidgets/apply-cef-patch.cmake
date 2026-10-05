@@ -29,3 +29,8 @@ apply_wx_cef_patch(
     "cef_api_hash(CEF_API_VERSION, 0)"
     "src/common/webview_chromium.cpp"
 )
+apply_wx_cef_patch(
+    "0005-cef-script-message-bridge.patch"
+    "wxWebViewChromium::AddScriptMessageHandler"
+    "src/common/webview_chromium.cpp"
+)

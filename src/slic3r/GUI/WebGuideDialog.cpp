@@ -175,9 +175,6 @@ GuideFrame::GuideFrame(GUI_App *pGUI, long style)
         wxLogError("Could not init m_browser");
         return;
     }
-    m_browser->Hide();
-    m_browser->SetSize(0, 0);
-
     SetSizer(topsizer);
 
     topsizer->Add(m_browser, wxSizerFlags().Expand().Proportion(1));
@@ -197,6 +194,10 @@ GuideFrame::GuideFrame(GUI_App *pGUI, long style)
     int MaxY         = (screenheight - pSize.y) > 0 ? (screenheight - pSize.y) / 2 : 0;
     wxPoint tmpPT((screenwidth - pSize.x) / 2, MaxY);
     Move(tmpPT);
+    // Keep the CEF widget visible and at its sizer-assigned size during GTK
+    // realization. Hiding it and forcing a 0x0 size here can make wxWebView's
+    // Chromium backend create its native browser with an unusable child area.
+    Layout();
 #ifdef __WXMSW__
     this->Bind(wxEVT_CHAR_HOOK, [this](wxKeyEvent& e) {
         if ((m_page == BBL_FILAMENT_ONLY || m_page == BBL_MODELS_ONLY) && e.GetKeyCode() == WXK_ESCAPE) {
@@ -410,6 +411,7 @@ void GuideFrame::OnNavigationComplete(wxWebViewEvent &evt)
 
     m_browser->Show();
     Layout();
+    m_browser->SetFocus();
 
     wxString NewUrl = evt.GetURL();
 

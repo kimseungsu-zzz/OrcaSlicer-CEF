@@ -261,8 +261,7 @@ function clearCookie(name) {
 function IsInSlicer()
 {
 	let bMatch=navigator.userAgent.match(  RegExp('BBL-Slicer','i') );
-	
-	return bMatch;
+	return bMatch || (window.wx && typeof window.wx.postMessage === 'function');
 }
 
 

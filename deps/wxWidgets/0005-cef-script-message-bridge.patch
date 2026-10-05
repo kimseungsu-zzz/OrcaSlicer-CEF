@@ -1,0 +1,159 @@
+diff --git a/include/wx/webview_chromium.h b/include/wx/webview_chromium.h
+index 7d09652..f1df21b 100644
+--- a/include/wx/webview_chromium.h
++++ b/include/wx/webview_chromium.h
+@@ -47,6 +47,8 @@ public:
+ 
+     ~wxWebViewChromium();
+ 
++    void SetFocus() override;
++
+     void SetPageSource(const wxString& pageSource);
+ 
+     void SetPageText(const wxString& pageText);
+@@ -128,6 +130,9 @@ public:
+ 
+     virtual bool RunScript(const wxString& javascript, wxString* output = nullptr) const override;
+ 
++    virtual bool AddScriptMessageHandler(const wxString& name) override;
++    virtual bool RemoveScriptMessageHandler(const wxString& name) override;
++
+     //Virtual Filesystem Support
+     virtual void RegisterHandler(wxSharedPtr<wxWebViewHandler> handler) override;
+ 
+diff --git a/src/common/webview_chromium.cpp b/src/common/webview_chromium.cpp
+index 05931d4..613f625 100644
+--- a/src/common/webview_chromium.cpp
++++ b/src/common/webview_chromium.cpp
+@@ -67,6 +67,7 @@ wxGCC_WARNING_SUPPRESS(unused-parameter)
+ #include "include/cef_app.h"
+ #include "include/cef_browser.h"
+ #include "include/cef_client.h"
++#include "include/cef_focus_handler.h"
+ #include "include/cef_request_context_handler.h"
+ #include "include/cef_scheme.h"
+ #include "include/cef_string_visitor.h"
+@@ -333,6 +334,7 @@ struct ImplData
+ class ClientHandler : public CefClient,
+     public CefContextMenuHandler,
+     public CefDisplayHandler,
++    public CefFocusHandler,
+     public CefLifeSpanHandler,
+     public CefLoadHandler,
+     public CefRequestHandler,
+@@ -358,6 +360,7 @@ public:
+     // Overridden CefClient methods
+     virtual CefRefPtr<CefContextMenuHandler> GetContextMenuHandler() override { return this; }
+     virtual CefRefPtr<CefDisplayHandler> GetDisplayHandler() override  { return this; }
++    virtual CefRefPtr<CefFocusHandler> GetFocusHandler() override { return this; }
+     virtual CefRefPtr<CefLifeSpanHandler> GetLifeSpanHandler() override  { return this; }
+     virtual CefRefPtr<CefLoadHandler> GetLoadHandler() override  { return this; }
+     virtual CefRefPtr<CefRequestHandler> GetRequestHandler() override { return this; }
+@@ -381,6 +384,7 @@ public:
+         const CefString& message,
+         const CefString& source,
+         int line) override;
++    virtual bool OnSetFocus(CefRefPtr<CefBrowser> browser, FocusSource source) override;
+ 
+     // CefContextMenuHandler methods
+     virtual void OnBeforeContextMenu(CefRefPtr<CefBrowser> browser,
+@@ -811,6 +815,7 @@ bool wxWebViewChromium::Create(wxWindow* parent,
+     {
+         return false;
+     }
++
+     if ( !InitCEF(m_implData->m_config) )
+         return false;
+ 
+@@ -861,10 +866,29 @@ bool wxWebViewChromium::Create(wxWindow* parent,
+ #endif
+ 
+     Bind(wxEVT_SIZE, &wxWebViewChromium::OnSize, this);
++    Bind(wxEVT_SET_FOCUS, [this](wxFocusEvent& event) {
++        event.Skip();
++        if (m_clientHandler) {
++            CefRefPtr<CefBrowser> browser = m_clientHandler->GetBrowser();
++            if (browser)
++                browser->GetHost()->SetFocus(true);
++        }
++    });
+ 
+     return true;
+ }
+ 
++void wxWebViewChromium::SetFocus()
++{
++    wxControl::SetFocus();
++
++    if (m_clientHandler) {
++        CefRefPtr<CefBrowser> browser = m_clientHandler->GetBrowser();
++        if (browser)
++            browser->GetHost()->SetFocus(true);
++    }
++}
++
+ #ifdef __WXGTK__
+ 
+ void wxWebViewChromium::GTKHandleRealized()
+@@ -1497,6 +1521,18 @@ bool wxWebViewChromium::RunScript(const wxString& javascript, wxString* output)
+         return true;
+ }
+ 
++bool wxWebViewChromium::AddScriptMessageHandler(const wxString& name)
++{
++    // The wx bridge is installed by wxCefBrowserApp for every renderer context.
++    return name == "wx";
++}
++
++bool wxWebViewChromium::RemoveScriptMessageHandler(const wxString& name)
++{
++    // The bridge is process-wide and cannot be removed from one view safely.
++    return name == "wx";
++}
++
+ bool wxWebViewChromium::IsBusy() const
+ {
+     auto browser = m_clientHandler->GetBrowser();
+@@ -1652,6 +1688,20 @@ ClientHandler::OnProcessMessageReceived(CefRefPtr<CefBrowser> WXUNUSED(browser),
+         return false;
+     }
+ 
++    if (message->GetName() == "wxWebViewMessage")
++    {
++        CefRefPtr<CefListValue> args = message->GetArgumentList();
++        if (!args || args->GetSize() != 1 || args->GetType(0) != VTYPE_STRING)
++            return true;
++
++        wxWebViewEvent event(wxEVT_WEBVIEW_SCRIPT_MESSAGE_RECEIVED,
++                             m_webview.GetId(), frame->GetURL().ToWString(),
++                             frame->GetName().ToWString(), wxWEBVIEW_NAV_ACTION_NONE, "wx");
++        event.SetString(args->GetString(0).ToWString());
++        event.SetEventObject(&m_webview);
++        return m_webview.HandleWindowEvent(event);
++    }
++
+     wxWebViewChromiumEvent event(m_webview, *frame, *message);
+ 
+     return m_webview.HandleWindowEvent(event);
+@@ -1689,6 +1739,21 @@ bool ClientHandler::OnConsoleMessage(CefRefPtr<CefBrowser> WXUNUSED(browser),
+     return false;
+ }
+ 
++bool ClientHandler::OnSetFocus(CefRefPtr<CefBrowser> browser, FocusSource WXUNUSED(source))
++{
++#ifdef __WXGTK__
++    const CefWindowHandle handle = browser->GetHost()->GetWindowHandle();
++    XWindowAttributes attributes{};
++    Display* display = wxGetX11Display();
++    if (handle && XGetWindowAttributes(display, handle, &attributes) &&
++        attributes.map_state == IsViewable) {
++        XSetInputFocus(display, handle, RevertToParent, CurrentTime);
++        XFlush(display);
++    }
++#endif
++    return false;
++}
++
+ // CefContextMenuHandler methods
+ void ClientHandler::OnBeforeContextMenu(CefRefPtr<CefBrowser> WXUNUSED(browser),
+                                         CefRefPtr<CefFrame> WXUNUSED(frame),
