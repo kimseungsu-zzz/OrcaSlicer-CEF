@@ -17,6 +17,8 @@ let
     pkgs.nss
     pkgs.webkitgtk_4_1
     pkgs.libsoup_3
+    pkgs.gtk3
+    pkgs.gsettings-desktop-schemas
   ];
   runtimeLibs = pkgs.lib.makeLibraryPath runtimeInputs;
 in
@@ -59,7 +61,8 @@ pkgs.stdenvNoCC.mkDerivation {
     chmod u+w "$out/bin/orca-slicer"
     mv "$out/bin/orca-slicer" "$out/bin/orca-slicer-unwrapped"
     makeWrapper "$out/bin/orca-slicer-unwrapped" "$out/bin/orca-slicer" \
-      --prefix LD_LIBRARY_PATH : "$out/bin:$out/libpython:${runtimeLibs}"
+      --prefix LD_LIBRARY_PATH : "$out/bin:$out/libpython:${runtimeLibs}" \
+      --prefix XDG_DATA_DIRS : "${pkgs.gtk3}/share:${pkgs.gtk3}/share/gsettings-schemas/${pkgs.gtk3.name}:${pkgs.gsettings-desktop-schemas}/share:${pkgs.gsettings-desktop-schemas}/share/gsettings-schemas/${pkgs.gsettings-desktop-schemas.name}"
 
     for size in 32 128 192; do
       install -Dm644 "$out/resources/images/OrcaSlicer_''${size}px.png" \
