@@ -1520,7 +1520,15 @@ void MainFrame::init_tabpanel() {
     m_lazy_pages.push_back(m_monitor_page);
     m_tabpanel->AddPage(TAB_ID_MONITOR, m_monitor_page, _L("Device"), "tab_monitor_active");
 
-    m_printer_view_page = new LazyPage<PrinterWebView>(m_tabpanel, TAB_ID_MONITOR_WEB, 50, [this](wxWindow* parent) {
+#if defined(__linux__) && defined(SLIC3R_USE_CEF)
+    // CEF creates a native X11 child window. Keep it out of the idle prebuild
+    // while the page is hidden so its initialization cannot interfere with the
+    // main window's startup focus; it is built when the user opens this tab.
+    constexpr int printer_webview_prebuild_order = -1;
+#else
+    constexpr int printer_webview_prebuild_order = 50;
+#endif
+    m_printer_view_page = new LazyPage<PrinterWebView>(m_tabpanel, TAB_ID_MONITOR_WEB, printer_webview_prebuild_order, [this](wxWindow* parent) {
         auto* view = new PrinterWebView(parent);
         if (!m_printer_url.empty())
             view->load_url(m_printer_url, m_printer_api_key);
