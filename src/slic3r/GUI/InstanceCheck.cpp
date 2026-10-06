@@ -315,7 +315,12 @@ namespace instance_check_internal
 bool instance_check(int argc, char** argv, bool app_config_single_instance)
 {
 	std::size_t hashed_path;
-#ifdef _WIN32
+#if defined(__linux__) && defined(SLIC3R_USE_CEF)
+	// CEF's persistent UserData directory is shared by Linux CEF builds. A
+	// process-specific executable hash would allow another build to initialize
+	// CEF against the same profile concurrently, which can crash in CEF startup.
+	hashed_path = std::hash<std::string>{}(data_dir() + "/CEF");
+#elif defined(_WIN32)
 	hashed_path = std::hash<std::string>{}(boost::filesystem::system_complete(argv[0]).string());
 #else
 	boost::system::error_code ec;
@@ -354,8 +359,14 @@ bool instance_check(int argc, char** argv, bool app_config_single_instance)
 	GUI::wxGetApp().set_instance_hash(hashed_path);
 	BOOST_LOG_TRIVIAL(debug) <<"full path: "<< lock_name;
 	instance_check_internal::CommandLineAnalysis cla = instance_check_internal::process_command_line(argc, argv);
+#if defined(__linux__) && defined(SLIC3R_USE_CEF)
+	// All Linux CEF builds use the same persistent CEF profile, so they must
+	// share one process lock even when the user normally allows multiple windows.
+	cla.should_send = true;
+#else
 	if (! cla.should_send.has_value())
 		cla.should_send = app_config_single_instance;
+#endif
 #ifdef _WIN32
 	GUI::wxGetApp().init_single_instance_checker(lock_name + ".lock", data_dir() + "\\cache\\");
 	if (cla.should_send.value() && GUI::wxGetApp().single_instance_checker()->IsAnotherRunning()) {
