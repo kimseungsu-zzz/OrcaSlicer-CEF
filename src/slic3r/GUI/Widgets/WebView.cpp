@@ -56,7 +56,7 @@ namespace fs = boost::filesystem;
 #endif
 #if defined(SLIC3R_USE_CEF) && !wxUSE_WEBVIEW_CHROMIUM
 #error "SLIC3R_USE_CEF requires wxWidgets built with wxUSE_WEBVIEW_CHROMIUM"
-#elif !defined(SLIC3R_USE_CEF) && !wxUSE_WEBVIEW_WEBKIT
+#elif !defined(SLIC3R_USE_CEF) && !(wxUSE_WEBVIEW_WEBKIT || wxUSE_WEBVIEW_WEBKIT2)
 #error "Linux WebView support requires wxWidgets built with WebKitGTK"
 #endif
 #endif
