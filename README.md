@@ -166,6 +166,21 @@ The [Homebrew cask](https://formulae.brew.sh/cask/orcaslicer) installs the offic
 
 ## Linux
 
+### Nix package (from an existing local build)
+
+After building the CEF-enabled Release target and its dependencies, create a
+Nix store package with:
+
+```shell
+./package-nix.sh
+nix profile install ./result-nix
+orca-slicer
+```
+
+`package.nix` packages the local CMake install tree; it does not rebuild the
+application from source. The package includes the CEF and Python runtimes and
+currently occupies about 3.7 GB in the Nix store.
+
 ### Flathub (Recommended)
 
 OrcaSlicer is available through FlatHub:
