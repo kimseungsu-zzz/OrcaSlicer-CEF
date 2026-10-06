@@ -135,22 +135,13 @@ index 05931d4..613f625 100644
      wxWebViewChromiumEvent event(m_webview, *frame, *message);
  
      return m_webview.HandleWindowEvent(event);
-@@ -1689,6 +1739,21 @@ bool ClientHandler::OnConsoleMessage(CefRefPtr<CefBrowser> WXUNUSED(browser),
+@@ -1689,6 +1739,10 @@ bool ClientHandler::OnConsoleMessage(CefRefPtr<CefBrowser> WXUNUSED(browser),
      return false;
  }
  
-+bool ClientHandler::OnSetFocus(CefRefPtr<CefBrowser> browser, FocusSource WXUNUSED(source))
++bool ClientHandler::OnSetFocus(CefRefPtr<CefBrowser> WXUNUSED(browser),
++                              FocusSource WXUNUSED(source))
 +{
-+#ifdef __WXGTK__
-+    const CefWindowHandle handle = browser->GetHost()->GetWindowHandle();
-+    XWindowAttributes attributes{};
-+    Display* display = wxGetX11Display();
-+    if (handle && XGetWindowAttributes(display, handle, &attributes) &&
-+        attributes.map_state == IsViewable) {
-+        XSetInputFocus(display, handle, RevertToParent, CurrentTime);
-+        XFlush(display);
-+    }
-+#endif
 +    return false;
 +}
 +

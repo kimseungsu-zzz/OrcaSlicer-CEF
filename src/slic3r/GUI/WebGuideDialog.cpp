@@ -411,7 +411,6 @@ void GuideFrame::OnNavigationComplete(wxWebViewEvent &evt)
 
     m_browser->Show();
     Layout();
-    m_browser->SetFocus();
 
     wxString NewUrl = evt.GetURL();
 
